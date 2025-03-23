@@ -2,7 +2,7 @@ WITH registered_users AS (
     SELECT 
         device_id,
         CAST(reg_at AS DATE) AS reg_date  -- 注册日期（去时间部分）
-    FROM '玩家表' -- user表，非活跃表，主要获取注册时间
+    FROM '玩家表' -- user表，非活跃表，主要获取注册时间，需要指定
 
     WHERE reg_at IS NOT NULL              -- 确保有注册日期
 
@@ -14,7 +14,9 @@ WITH registered_users AS (
         AND country_code = 'US'
 		AND channel = 'iOS'
         AND network = 'Facebook'
-        AND event_id = 2001 -- 应用服务器活跃用户快照同步事件，节约查询计算量
+
+        -- 需手动聚合为同期群成熟的数据，这方面sql后续可改进
+        
 
 
 ),
@@ -22,10 +24,11 @@ active_events AS (
     SELECT 
         o.device_id,
         CAST(o.reported_at AS DATE) AS login_date  -- 活跃日期（去时间部分）
-    FROM '活跃表'
-    INNER JOIN registered_users r          -- 内关联保证只保留有注册的用户
+    FROM '活跃表' o   -- 需要指定
+    INNER JOIN registered_users r          -- 内关联保证只保留有注册的玩家
         ON o.device_id = r.device_id
     WHERE o.reported_at IS NOT NULL        -- 确保有活跃日期
+        AND event_id = 2001 -- 应用服务器活跃玩家快照同步事件，节约查询计算量
 ),
 retention_data AS (
     SELECT 
@@ -39,7 +42,7 @@ retention_data AS (
 )
 SELECT
     reg_date AS 注册日期,
-    COUNT(DISTINCT device_id) AS 注册用户数,
+    COUNT(DISTINCT device_id) AS 注册玩家数,
     COUNT(DISTINCT CASE WHEN retention_day = 1 THEN device_id END) 
          / COUNT(DISTINCT device_id) AS 次留,
     COUNT(DISTINCT CASE WHEN retention_day = 2 THEN device_id END) 
